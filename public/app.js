@@ -52,7 +52,39 @@ function renderKpis(result) {
   setText($('#fitRecommendation'), decision.recommendation || 'Evaluation complete');
   $('#fitMeter').style.width = match + '%';
 }
-function renderRings(agents) { const root = $('#rings'); root.replaceChildren(); const values = [['MOVE', 'Technical Depth', scoreFor(agents, ['Technical Agent'])], ['EXERCISE', 'HR Alignment', scoreFor(agents, ['HR & Culture Agent'])], ['STAND', 'Skeptic Verification', scoreFor(agents, ['Skeptic Agent'])]]; values.forEach(([ringName, label, value]) => { const ring = document.createElement('div'); ring.className = 'ring'; ring.style.setProperty('--p', `${Math.max(0, Math.min(100, value)) * 3.6}deg`); const inner = document.createElement('div'); inner.append(setText(document.createElement('div'), ringName).classList.add('ring-label') && inner.lastChild); const val = document.createElement('div'); val.className = 'ring-value'; setText(val, `${value}%`); inner.append(val); const caption = document.createElement('div'); caption.className = 'ring-label'; setText(caption, label); inner.append(caption); ring.append(inner); root.append(ring); }); }
+function renderRings(agents) {
+  const root = $('#rings');
+  root.replaceChildren();
+  const values = [
+    ['MOVE', 'Technical Depth', scoreFor(agents, ['Technical Agent'])],
+    ['EXERCISE', 'HR Alignment', scoreFor(agents, ['HR & Culture Agent'])],
+    ['STAND', 'Skeptic Verification', scoreFor(agents, ['Skeptic Agent'])]
+  ];
+  values.forEach(([ringName, label, value]) => {
+    const ring = document.createElement('div');
+    ring.className = 'ring';
+    ring.style.setProperty('--p', `${Math.max(0, Math.min(100, value)) * 3.6}deg`);
+    const inner = document.createElement('div');
+
+    const ringTitle = document.createElement('div');
+    ringTitle.className = 'ring-label';
+    setText(ringTitle, ringName);
+    inner.append(ringTitle);
+
+    const val = document.createElement('div');
+    val.className = 'ring-value';
+    setText(val, `${value}%`);
+    inner.append(val);
+
+    const caption = document.createElement('div');
+    caption.className = 'ring-label';
+    setText(caption, label);
+    inner.append(caption);
+
+    ring.append(inner);
+    root.append(ring);
+  });
+}
 function renderBars(agents) { const root = $('#agentBars'); root.replaceChildren(); agents.map(normalizeAgent).forEach((agent) => { const item = document.createElement('div'); item.className = 'bar-item'; const value = Number(agent.score) || 0; const valueLabel = document.createElement('span'); valueLabel.className = 'bar-value'; setText(valueLabel, `${value}%`); const bar = document.createElement('div'); bar.className = 'bar'; bar.style.height = `${Math.max(4, value)}%`; bar.tabIndex = 0; bar.setAttribute('role', 'img'); bar.setAttribute('aria-label', `${agent.agent} score ${value}%`); const label = document.createElement('span'); label.className = 'bar-label'; setText(label, agent.agent.replace(' Agent', '')); item.append(valueLabel, bar, label); root.append(item); }); }
 function renderMatrix(debate = {}) { const root = $('#matrix'); root.replaceChildren(); const groups = [['Agreed Points', debate.agreedPoints], ['Disagreed Points', debate.disagreedPoints], ['Shifted Stances', debate.shiftedStances], ['Unresolved Stances', debate.unresolvedStances]]; groups.forEach(([title, entries]) => { const block = document.createElement('section'); block.className = 'matrix-block'; block.append(setText(document.createElement('h3'), title)); if (!entries?.length) block.append(setText(document.createElement('p'), 'No explicit points recorded.')); else entries.forEach((entry) => { const item = document.createElement('div'); item.className = 'matrix-item'; setText(item, entry.point || entry.reason || entry.stance || JSON.stringify(entry)); if (entry.agents?.length) { const meta = document.createElement('span'); meta.className = 'matrix-meta'; setText(meta, entry.agents.join(' · ')); item.append(meta); } (entry.evidence || []).slice(0, 2).forEach((ev) => { const quote = document.createElement('span'); quote.className = 'matrix-meta'; setText(quote, `Evidence: “${ev.quote || ev.fact || ''}”`); item.append(quote); }); block.append(item); }); root.append(block); }); }
 function renderDebate(debate = {}) { const root = $('#debate'); root.replaceChildren(); if (!debate.transcript?.length) { root.append(setText(document.createElement('p'), debate.error ? 'Debate fallback used. The final decision used available evidence.' : 'No debate transcript available.')); return; } debate.transcript.forEach((turn) => { const article = document.createElement('article'); article.className = 'debate-turn'; const speaker = document.createElement('div'); speaker.className = 'speaker'; setText(speaker, `${turn.speaker || 'Agent'}${turn.target ? ` → ${turn.target}` : ''}`); const message = document.createElement('div'); message.className = 'msg'; setText(message, turn.point || turn.stance || turn.message || 'Insufficient evidence in source documents.'); article.append(speaker, message); root.append(article); }); }
