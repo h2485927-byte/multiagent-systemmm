@@ -5,12 +5,17 @@ import cors from 'cors';
 import rateLimit from 'express-rate-limit';
 import multer from 'multer';
 import { createRequire } from 'module';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { buildProfile } from './src/profile/profileBuilder.js';
 import { runPipeline } from './src/pipeline.js';
 import { geminiStatus } from './src/llm/llmClient.js';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const publicDir = path.join(__dirname, 'public');
 const app = express();
 const port = Number(process.env.PORT || 3000);
 
@@ -25,7 +30,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: process.env.ALLOWED_ORIGIN || true, methods: ['GET', 'POST'] }));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 100, standardHeaders: true, legacyHeaders: false }));
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static('public'));
+app.use(express.static(publicDir));
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -58,6 +63,8 @@ async function extractPdf(file, label) {
   }
   return text;
 }
+
+app.get('/', (_req, res) => res.sendFile(path.join(publicDir, 'index.html')));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, gemini: geminiStatus() }));
 
