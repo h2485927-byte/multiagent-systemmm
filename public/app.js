@@ -22,7 +22,36 @@ function renderAgentSkeletons() { const root = $('#agents'); root.replaceChildre
 function renderAgents(agents) { const root = $('#agents'); root.replaceChildren(); agents.map(normalizeAgent).forEach((agent) => { const card = document.createElement('article'); card.className = 'opinion-card'; card.append(setText(document.createElement('h3'), agent.agent)); card.append(setText(document.createElement('span'), `Score ${agent.score ?? 'N/A'} · Confidence ${agent.confidence ?? 0}%`)); const bar = document.createElement('div'); bar.className = 'score-bar-wrap'; const fill = document.createElement('div'); fill.className = 'score-bar'; fill.style.width = `${Math.max(0, Math.min(100, Number(agent.score) || 0))}%`; bar.append(fill); card.append(bar); if (agent.stance) card.append(setText(document.createElement('p'), agent.stance)); if (agent.error) card.append(setText(document.createElement('p'), `Fallback: ${agent.error.message || 'Agent unavailable'}`)); (agent.evidence || []).forEach((item) => { const quote = document.createElement('blockquote'); quote.className = 'quote'; setText(quote, `“${item.quote || item.fact || 'Insufficient evidence in source documents'}” — ${item.source || 'Source document'}`); card.append(quote); }); root.append(card); }); }
 
 function scoreFor(agents, keys) { const agent = agents.map(normalizeAgent).find((a) => keys.includes(a.agent)); return Number(agent?.score) || 0; }
-function renderKpis(result) { const decision = result.finalDecision || {}; const items = [['Recommendation', decision.recommendation || 'Unavailable'], ['Overall Match', `${decision.matchPercent ?? 'N/A'}%`], ['Confidence', `${decision.confidence ?? 0}%`], ['Agent Issues', result.diagnostics?.failedAgents?.length ? `${result.diagnostics.failedAgents.length}` : '0']]; const root = $('#kpis'); root.replaceChildren(); items.forEach(([label, value]) => { const card = document.createElement('article'); card.className = 'kpi'; card.append(setText(document.createElement('div'), label)); card.append(setText(document.createElement('div'), value).classList.add('kpi-value') && card.lastChild); root.append(card); }); }
+function renderKpis(result) {
+  const decision = result.finalDecision || {};
+  const match = Math.max(0, Math.min(100, Number(decision.matchPercent) || 0));
+  const items = [
+    ['Agreed points', result.debate?.agreedPoints?.length ?? 0, 'Strong alignment'],
+    ['Disagreed points', result.debate?.disagreedPoints?.length ?? 0, 'Key concerns'],
+    ['Shifted stances', result.debate?.shiftedStances?.length ?? 0, 'Nuanced views'],
+    ['Unresolved items', result.debate?.unresolvedStances?.length ?? 0, 'Requires review']
+  ];
+  const root = $('#kpis');
+  root.replaceChildren();
+  items.forEach(([label, value, sub]) => {
+    const card = document.createElement('article');
+    card.className = 'kpi';
+    const labelNode = document.createElement('div');
+    labelNode.className = 'kpi-label';
+    setText(labelNode, label);
+    const valueNode = document.createElement('div');
+    valueNode.className = 'kpi-value';
+    setText(valueNode, value);
+    const subNode = document.createElement('div');
+    subNode.className = 'kpi-sub';
+    setText(subNode, sub);
+    card.append(labelNode, valueNode, subNode);
+    root.append(card);
+  });
+  setText($('#fitScore'), match || 'N/A');
+  setText($('#fitRecommendation'), decision.recommendation || 'Evaluation complete');
+  $('#fitMeter').style.width = match + '%';
+}
 function renderRings(agents) { const root = $('#rings'); root.replaceChildren(); const values = [['MOVE', 'Technical Depth', scoreFor(agents, ['Technical Agent'])], ['EXERCISE', 'HR Alignment', scoreFor(agents, ['HR & Culture Agent'])], ['STAND', 'Skeptic Verification', scoreFor(agents, ['Skeptic Agent'])]]; values.forEach(([ringName, label, value]) => { const ring = document.createElement('div'); ring.className = 'ring'; ring.style.setProperty('--p', `${Math.max(0, Math.min(100, value)) * 3.6}deg`); const inner = document.createElement('div'); inner.append(setText(document.createElement('div'), ringName).classList.add('ring-label') && inner.lastChild); const val = document.createElement('div'); val.className = 'ring-value'; setText(val, `${value}%`); inner.append(val); const caption = document.createElement('div'); caption.className = 'ring-label'; setText(caption, label); inner.append(caption); ring.append(inner); root.append(ring); }); }
 function renderBars(agents) { const root = $('#agentBars'); root.replaceChildren(); agents.map(normalizeAgent).forEach((agent) => { const item = document.createElement('div'); item.className = 'bar-item'; const value = Number(agent.score) || 0; const valueLabel = document.createElement('span'); valueLabel.className = 'bar-value'; setText(valueLabel, `${value}%`); const bar = document.createElement('div'); bar.className = 'bar'; bar.style.height = `${Math.max(4, value)}%`; bar.tabIndex = 0; bar.setAttribute('role', 'img'); bar.setAttribute('aria-label', `${agent.agent} score ${value}%`); const label = document.createElement('span'); label.className = 'bar-label'; setText(label, agent.agent.replace(' Agent', '')); item.append(valueLabel, bar, label); root.append(item); }); }
 function renderMatrix(debate = {}) { const root = $('#matrix'); root.replaceChildren(); const groups = [['Agreed Points', debate.agreedPoints], ['Disagreed Points', debate.disagreedPoints], ['Shifted Stances', debate.shiftedStances], ['Unresolved Stances', debate.unresolvedStances]]; groups.forEach(([title, entries]) => { const block = document.createElement('section'); block.className = 'matrix-block'; block.append(setText(document.createElement('h3'), title)); if (!entries?.length) block.append(setText(document.createElement('p'), 'No explicit points recorded.')); else entries.forEach((entry) => { const item = document.createElement('div'); item.className = 'matrix-item'; setText(item, entry.point || entry.reason || entry.stance || JSON.stringify(entry)); if (entry.agents?.length) { const meta = document.createElement('span'); meta.className = 'matrix-meta'; setText(meta, entry.agents.join(' · ')); item.append(meta); } (entry.evidence || []).slice(0, 2).forEach((ev) => { const quote = document.createElement('span'); quote.className = 'matrix-meta'; setText(quote, `Evidence: “${ev.quote || ev.fact || ''}”`); item.append(quote); }); block.append(item); }); root.append(block); }); }
