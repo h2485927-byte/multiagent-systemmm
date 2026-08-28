@@ -1,0 +1,1 @@
+import {describe,it,expect} from 'vitest'; import {buildPrompt} from '../src/agents/agentBase.js'; describe('agent prompt',()=>it('isolates and requires evidence',()=>{const p=buildPrompt('technicalAgent','test',{resumeText:'r',transcriptText:'t',jdText:'j'});expect(p).toContain('ROUND ONE IS ISOLATED');expect(p).toContain('verbatim quote evidence')}));

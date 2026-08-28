@@ -1,0 +1,1 @@
+import {describe,it,expect} from 'vitest'; import {fallbackDecision} from '../src/decision/finalDecision.js'; describe('fallback',()=>it('handles partial failure',()=>expect(fallbackDecision([{score:70}], 'x').recommendation).toBe('Conditional')));
