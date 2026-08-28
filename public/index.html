@@ -38,7 +38,26 @@
     </section>
 
     <section id="recruiter" hidden aria-live="polite" aria-labelledby="recruiterHeading">
-      <div class="recruiter-hero section-heading"><div><span class="eyebrow">Post-evaluation</span><h2 id="recruiterHeading">Recruiter Admin Panel</h2><p id="success" class="hint"></p></div><button class="secondary-btn" id="backToSubmission" type="button">New Evaluation</button></div>
+      <section class="report-hero" aria-label="Candidate evaluation summary">
+        <div class="report-identity">
+          <div class="candidate-avatar" aria-hidden="true">CI</div>
+          <div>
+            <span class="eyebrow">Candidate Intelligence Report</span>
+            <h2 id="recruiterHeading">Evidence-weighted hiring evaluation</h2>
+            <p id="success" class="hint">Independent agent analysis, debate, and final synthesis.</p>
+          </div>
+        </div>
+        <div class="fit-score-card">
+          <span class="fit-label">Overall fit score</span>
+          <div class="fit-score"><strong id="fitScore">—</strong><span>/100</span></div>
+          <div class="fit-meter"><span id="fitMeter"></span></div>
+          <span id="fitRecommendation" class="fit-recommendation">Evaluation ready</span>
+        </div>
+        <button class="secondary-btn new-evaluation" id="backToSubmission" type="button">New Evaluation</button>
+      </section>
+      <div class="report-nav" aria-label="Report sections">
+        <span class="active">Executive summary</span><span>Evaluation overview</span><span>Agent consensus</span><span>Evidence trail</span>
+      </div>
       <div class="kpi-grid" id="kpis"></div>
       <div class="dashboard-grid">
         <article class="card chart-card"><div class="chart-heading"><div><span class="card-kicker">Candidate fit</span><h3>Apple Activity Rings</h3></div></div><div id="rings" class="rings-grid" aria-label="Technical depth, HR alignment and skeptic verification scores"></div></article>
