@@ -91,7 +91,109 @@ function renderDebate(debate = {}) { const root = $('#debate'); root.replaceChil
 function listWithEvidence(title, entries) { const wrap = document.createElement('div'); wrap.append(setText(document.createElement('h3'), title)); const list = document.createElement('ul'); list.className = 'decision-list'; (entries || []).forEach((entry) => { const li = document.createElement('li'); setText(li, entry.claim || entry.point || safeText(entry)); const quote = entry.evidence?.[0]?.quote || entry.quote; if (quote) { const span = document.createElement('span'); span.className = 'decision-quote'; setText(span, `“${quote}”`); li.append(span); } list.append(li); }); if (!list.childElementCount) list.append(setText(document.createElement('li'), 'Insufficient evidence in source documents.')); wrap.append(list); return wrap; }
 function renderDecision(decision = {}) { const root = $('#decision'); root.replaceChildren(); const head = document.createElement('div'); head.append(setText(document.createElement('div'), decision.recommendation || 'Unavailable').classList.add('recommendation-big') && head.lastChild); head.append(setText(document.createElement('p'), `Match ${decision.matchPercent ?? 'N/A'}% · Confidence ${decision.confidence ?? 0}%`).classList.add('confidence-meter') && head.lastChild); root.append(head, listWithEvidence('Strengths', decision.strengths), listWithEvidence('Concerns', decision.concerns), listWithEvidence('Unresolved Friction', decision.unresolvedFriction)); if (decision.rationale) { const rationale = document.createElement('div'); rationale.className = 'rationale-box'; rationale.append(setText(document.createElement('strong'), 'Decision rationale'), setText(document.createElement('p'), decision.rationale)); root.append(rationale); } }
 function buildAudio(result) { if (result.audioOverview?.script) return result.audioOverview.script; const d = result.finalDecision || {}; const strengths = (d.strengths || []).map((x) => x.claim).filter(Boolean).slice(0, 2).join('. '); const concerns = (d.concerns || []).map((x) => x.claim).filter(Boolean).slice(0, 2).join('. '); return `Recruiter overview. ${d.recommendation || 'Evaluation complete'}. Overall match is ${d.matchPercent ?? 'not available'} percent. ${strengths ? `Key strengths: ${strengths}.` : ''} ${concerns ? `Major concerns: ${concerns}.` : ''} Review the evidence citations and unresolved debate points before making a hiring decision.`; }
-function renderResult(result) { state.result = result; const agents = result.agents || []; renderAgents(agents); renderKpis(result); renderRings(agents); renderBars(agents); renderMatrix(result.debate || {}); renderDebate(result.debate || {}); renderDecision(result.finalDecision || {}); state.audio = buildAudio(result); setText($('#audioScript'), state.audio); $('#recruiterTab').disabled = false; $('#recruiterTab').click(); }
+function renderEvidenceList(rootSelector, entries = [], kind) {
+  const root = $(rootSelector);
+  if (!root) return;
+  root.replaceChildren();
+  if (!entries.length) {
+    root.append(setText(document.createElement('p'), 'No explicit evidence recorded.'));
+    return;
+  }
+  entries.slice(0, 4).forEach((entry) => {
+    const item = document.createElement('article');
+    item.className = 'evidence-item ' + kind;
+    const title = document.createElement('strong');
+    setText(title, entry.claim || entry.point || entry.reason || entry.stance || 'Evidence point');
+    const evidence = document.createElement('p');
+    const quote = entry.evidence?.[0]?.quote || entry.quote || entry.evidence?.[0]?.fact;
+    setText(evidence, quote ? 'Evidence: “' + quote + '”' : 'Evidence recorded by the evaluation agents.');
+    item.append(title, evidence);
+    root.append(item);
+  });
+}
+function renderOverview(result) {
+  const decision = result.finalDecision || {};
+  const agents = result.agents || [];
+  const root = $('#overviewMetrics');
+  if (!root) return;
+  root.replaceChildren();
+  const metrics = [
+    ['Technical Skills', scoreFor(agents, ['Technical Agent'])],
+    ['Technical Depth', scoreFor(agents, ['Technical Agent'])],
+    ['Production Mindset', scoreFor(agents, ['Hiring Manager Agent'])],
+    ['Communication', scoreFor(agents, ['HR & Culture Agent'])],
+    ['Learning Agility', Math.round((scoreFor(agents, ['Technical Agent']) + scoreFor(agents, ['HR & Culture Agent'])) / 2)],
+    ['Culture Fit', scoreFor(agents, ['HR & Culture Agent'])]
+  ];
+  metrics.forEach(([label, value]) => {
+    const row = document.createElement('div');
+    row.className = 'overview-row';
+    const head = document.createElement('div');
+    setText(head, label);
+    const score = document.createElement('b');
+    setText(score, (Number(value) || 0) + '/100');
+    const bar = document.createElement('div');
+    bar.className = 'overview-bar';
+    const fill = document.createElement('span');
+    fill.style.width = Math.max(0, Math.min(100, Number(value) || 0)) + '%';
+    bar.append(fill);
+    row.append(head, score, bar);
+    root.append(row);
+  });
+  const radar = $('#radarChart');
+  if (radar) {
+    const vals = metrics.slice(0, 5).map(([,v]) => Math.max(0, Math.min(100, Number(v) || 0)));
+    const points = vals.map((v, i) => {
+      const a = -Math.PI / 2 + i * (Math.PI * 2 / vals.length);
+      const r = 28 + (v / 100) * 58;
+      return (100 + Math.cos(a) * r).toFixed(1) + ',' + (100 + Math.sin(a) * r).toFixed(1);
+    }).join(' ');
+    radar.innerHTML = '<svg viewBox="0 0 200 200" role="img" aria-label="Candidate profile radar"><polygon class="radar-grid" points="100,20 176,75 147,165 53,165 24,75"></polygon><polygon class="radar-shape" points="' + points + '"></polygon>' + vals.map((v,i) => '<text x="' + (100 + Math.cos(-Math.PI/2+i*Math.PI*2/5)*88).toFixed(1) + '" y="' + (104 + Math.sin(-Math.PI/2+i*Math.PI*2/5)*88).toFixed(1) + '">' + v + '</text>').join('') + '</svg>';
+  }
+  return decision;
+}
+function renderConsensusDonut(result) {
+  const root = $('#consensusDonut');
+  if (!root) return;
+  const d = result.debate || {};
+  const values = [
+    ['Agreed', d.agreedPoints?.length || 0],
+    ['Disagreed', d.disagreedPoints?.length || 0],
+    ['Shifted', d.shiftedStances?.length || 0],
+    ['Unresolved', d.unresolvedStances?.length || 0]
+  ];
+  const total = Math.max(1, values.reduce((sum, [,v]) => sum + v, 0));
+  let angle = 0;
+  const segments = values.map(([label, value]) => {
+    const pct = Math.round(value / total * 100);
+    const start = angle; angle += pct;
+    return '<span class="donut-legend"><i style="--from:' + start + ';--to:' + angle + '"></i>' + label + ' <b>' + pct + '%</b></span>';
+  }).join('');
+  root.innerHTML = '<div class="donut-chart" style="--split:' + values.map(([,v]) => v/total*100).join(',') + '"><div>' + values.map(([,v]) => Math.round(v/total*100)).join('') + '</div></div><div class="donut-legend-list">' + segments + '</div>';
+}
+function renderResult(result) {
+  state.result = result;
+  const agents = result.agents || [];
+  renderAgents(agents);
+  renderKpis(result);
+  renderBars(agents);
+  renderMatrix(result.debate || {});
+  renderDebate(result.debate || {});
+  renderDecision(result.finalDecision || {});
+  renderOverview(result);
+  renderConsensusDonut(result);
+  renderEvidenceList('#strengthList', result.finalDecision?.strengths || [], 'strength');
+  renderEvidenceList('#concernList', result.finalDecision?.concerns || [], 'concern');
+  renderEvidenceList('#frictionList', result.finalDecision?.unresolvedFriction || [], 'friction');
+  const match = Math.max(0, Math.min(100, Number(result.finalDecision?.matchPercent) || 0));
+  const gauge = $('#fitGauge');
+  if (gauge) gauge.style.setProperty('--gauge', match * 3.6 + 'deg');
+  if ($('#fitGaugeValue')) setText($('#fitGaugeValue'), match || '—');
+  state.audio = buildAudio(result);
+  setText($('#audioScript'), state.audio);
+  $('#recruiterTab').disabled = false;
+  $('#recruiterTab').click();
+}
 
 async function evaluate() { if (state.running) return; if (['resumeFile', 'transcriptFile', 'jdFile'].some((key) => !state.files[key])) { setStatus('Upload Resume, Transcript, and Job Description PDFs before evaluation.', true); return; } state.lastRequest = true; $('#progressPanel').hidden = false; $('#recruiter').hidden = true; $('#retry').hidden = true; resetSteps(); setRunning(true); setStep(1); renderAgentSkeletons(); setStatus('Extracting profile and preparing source evidence…'); const formData = new FormData(); Object.entries(state.files).forEach(([key, file]) => formData.append(key, file)); const controller = new AbortController(); const timeout = setTimeout(() => controller.abort(), 180000); const progress = [setTimeout(() => { setStep(2); setStatus('Running four isolated agents in parallel…'); }, 1200), setTimeout(() => { setStep(3); setStatus('Dynamic debate is comparing agreements and disagreements…'); }, 30000), setTimeout(() => { setStep(4); setStatus('Synthesizing the evidence-weighted final decision…'); }, 60000)]; try { const response = await fetch('/api/evaluate', { method: 'POST', body: formData, signal: controller.signal }); const contentType = response.headers.get('content-type') || ''; const data = contentType.includes('application/json') ? await response.json() : { ok: false, error: { message: await response.text() } }; if (!response.ok || !data.ok) throw new Error(data.error?.message || `Request failed with status ${response.status}`); setStep(4, 'done'); renderResult(data); setStatus(data.diagnostics?.failedAgents?.length ? 'Evaluation completed with diagnostic fallbacks. Review the agent cards.' : 'Resume, transcript, and Job Description evaluated successfully. Recruiter report is ready.'); } catch (error) { const message = error.name === 'AbortError' ? 'Evaluation timed out. Check the server/Gemini connection and retry.' : (error.message || 'Network request failed.'); setStatus(`Evaluation failed: ${message}`, true); $('#retry').hidden = false; } finally { clearTimeout(timeout); progress.forEach(clearTimeout); setRunning(false); } }
 function switchView(view) { const recruiter = view === 'recruiter'; $('#submissionView').hidden = recruiter; $('#recruiter').hidden = !recruiter || !state.result; $('#submissionTab').classList.toggle('active', !recruiter); $('#recruiterTab').classList.toggle('active', recruiter); $('#submissionTab').setAttribute('aria-selected', String(!recruiter)); $('#recruiterTab').setAttribute('aria-selected', String(recruiter)); }
