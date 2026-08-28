@@ -1,55 +1,54 @@
 import streamlit as st
-import time
+from google import genai
+import os
 
-# Page configuration
+# Set page config
 st.set_page_config(
-    page_title="Multi-Agent System",
+    page_title="Gemini Multi-Agent System",
     page_icon="🤖",
     layout="wide"
 )
 
-# Custom title and description
-st.title("🤖 Multi-Agent System Dashboard")
-st.markdown("Interact with your multi-agent architecture below.")
+st.title("🤖 Multi-Agent System with Google Gemini")
+st.markdown("Run your multi-agent system powered by Gemini models.")
 
-# Sidebar for configuration and API Keys
+# Sidebar configuration
 with st.sidebar:
-    st.header("⚙️ Configuration")
-    api_key = st.text_input("API Key", type="password", help="Enter your LLM provider API key here.")
-    agent_model = st.selectbox("Select Model", ["gpt-4o", "gpt-3.5-turbo", "claude-3-5-sonnet"])
+    st.header("⚙️ API Configuration")
+    
+    # Check for secret or manual entry
+    api_key = st.text_input("Gemini API Key", type="password", help="Enter your Google AI Studio API key")
+    model_choice = st.selectbox("Select Model", ["gemini-2.5-flash", "gemini-2.5-pro"])
+    
     st.divider()
-    st.markdown("### Agent Settings")
-    temperature = st.slider("Temperature", 0.0, 1.0, 0.7)
+    st.markdown("[Get a Gemini API Key](https://aistudio.google.com/)")
 
-# Main interaction area
-prompt = st.text_area("Enter your objective or query:", placeholder="e.g., Analyze market trends and write a summary report...")
+# User prompt input
+prompt = st.text_area("Enter your prompt for the agents:", placeholder="e.g., Analyze the benefits of multi-agent AI systems...")
 
-if st.button("🚀 Run Multi-Agent System", type="primary"):
-    if not prompt:
-        st.warning("Please enter a prompt before running.")
+if st.button("🚀 Run Agent", type="primary"):
+    if not api_key:
+        st.error("Please provide a Gemini API Key in the sidebar.")
+    elif not prompt:
+        st.warning("Please enter a prompt.")
     else:
-        st.subheader("Execution Progress")
-        
-        # Simulated agent workflow - Replace with your actual agent calls
-        with st.status("Agents working...", expanded=True) as status:
-            st.write("🔍 **Planner Agent:** Breaking down the task...")
-            time.sleep(1.5)
+        try:
+            # Initialize Gemini Client
+            client = genai.Client(api_key=api_key)
             
-            st.write("🌐 **Research Agent:** Gathering information...")
-            time.sleep(2)
-            
-            st.write("✍️ **Writer Agent:** Synthesizing final response...")
-            time.sleep(1.5)
-            
-            status.update(label="All agents completed their tasks!", state="complete", expanded=False)
+            with st.status("Agent thinking...", expanded=True) as status:
+                st.write("📡 Connecting to Gemini API...")
+                
+                # Generate content from Gemini
+                response = client.models.generate_content(
+                    model=model_choice,
+                    contents=prompt
+                )
+                
+                status.update(label="Response generated successfully!", state="complete", expanded=False)
 
-        # Output area
-        st.subheader("📌 Final Result")
-        st.success("Agents completed the run successfully.")
-        st.markdown(f"**Objective:** {prompt}")
-        st.markdown("""
-        ### Agent Summary
-        - **Research:** Data collected successfully.
-        - **Analysis:** Key insights generated.
-        - **Status:** Complete.
-        """)
+            st.subheader("📌 Agent Output")
+            st.markdown(response.text)
+            
+        except Exception as e:
+            st.error(f"An error occurred: {str(e)}")
