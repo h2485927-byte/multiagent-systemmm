@@ -92,4 +92,8 @@ app.use((error, _req, res, _next) => {
   res.status(status).json({ ok: false, error: { code, message } });
 });
 
-app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(port, () => console.log(`Server running on http://localhost:${port}`));
+}
+
+export default app;
