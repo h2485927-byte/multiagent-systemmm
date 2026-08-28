@@ -86,7 +86,54 @@ function renderRings(agents) {
   });
 }
 function renderBars(agents) { const root = $('#agentBars'); root.replaceChildren(); agents.map(normalizeAgent).forEach((agent) => { const item = document.createElement('div'); item.className = 'bar-item'; const value = Number(agent.score) || 0; const valueLabel = document.createElement('span'); valueLabel.className = 'bar-value'; setText(valueLabel, `${value}%`); const bar = document.createElement('div'); bar.className = 'bar'; bar.style.height = `${Math.max(4, value)}%`; bar.tabIndex = 0; bar.setAttribute('role', 'img'); bar.setAttribute('aria-label', `${agent.agent} score ${value}%`); const label = document.createElement('span'); label.className = 'bar-label'; setText(label, agent.agent.replace(' Agent', '')); item.append(valueLabel, bar, label); root.append(item); }); }
-function renderMatrix(debate = {}) { const root = $('#matrix'); root.replaceChildren(); const groups = [['Agreed Points', debate.agreedPoints], ['Disagreed Points', debate.disagreedPoints], ['Shifted Stances', debate.shiftedStances], ['Unresolved Stances', debate.unresolvedStances]]; groups.forEach(([title, entries]) => { const block = document.createElement('section'); block.className = 'matrix-block'; block.append(setText(document.createElement('h3'), title)); if (!entries?.length) block.append(setText(document.createElement('p'), 'No explicit points recorded.')); else entries.forEach((entry) => { const item = document.createElement('div'); item.className = 'matrix-item'; setText(item, entry.point || entry.reason || entry.stance || JSON.stringify(entry)); if (entry.agents?.length) { const meta = document.createElement('span'); meta.className = 'matrix-meta'; setText(meta, entry.agents.join(' · ')); item.append(meta); } (entry.evidence || []).slice(0, 2).forEach((ev) => { const quote = document.createElement('span'); quote.className = 'matrix-meta'; setText(quote, `Evidence: “${ev.quote || ev.fact || ''}”`); item.append(quote); }); block.append(item); }); root.append(block); }); }
+function renderMatrix(debate = {}) {
+  const root = $('#matrix');
+  root.replaceChildren();
+  const groups = [
+    ['Agreed Points', debate.agreedPoints || [], 'alignment'],
+    ['Disagreed Points', debate.disagreedPoints || [], 'difference'],
+    ['Shifted Stances', debate.shiftedStances || [], 'shift'],
+    ['Unresolved Stances', debate.unresolvedStances || [], 'unresolved']
+  ];
+  groups.forEach(([title, entries, kind]) => {
+    const block = document.createElement('section');
+    block.className = 'matrix-block matrix-' + kind;
+    const heading = document.createElement('div');
+    heading.className = 'matrix-heading';
+    heading.append(setText(document.createElement('h3'), title));
+    const count = document.createElement('span');
+    setText(count, entries.length);
+    heading.append(count);
+    block.append(heading);
+    if (!entries.length) {
+      block.append(setText(document.createElement('p'), kind === 'shift' ? 'No stance changes were recorded.' : 'No explicit points recorded.'));
+    } else {
+      entries.slice(0, 3).forEach((entry) => {
+        const item = document.createElement('div');
+        item.className = 'matrix-item';
+        if (kind === 'shift') {
+          const transition = document.createElement('strong');
+          setText(transition, (entry.agent || 'Agent') + ': ' + (entry.from || 'Initial') + ' → ' + (entry.to || 'Refined'));
+          item.append(transition);
+          if (entry.reason) item.append(setText(document.createElement('p'), entry.reason));
+        } else {
+          item.append(setText(document.createElement('strong'), entry.point || entry.reason || entry.stance || 'Evidence point'));
+          if (entry.agents?.length) item.append(setText(document.createElement('span'), entry.agents.join(' · ')).classList.add('matrix-meta'));
+          if (entry.agent && kind === 'unresolved') item.append(setText(document.createElement('span'), entry.agent).classList.add('matrix-meta'));
+        }
+        const evidence = entry.evidence?.[0];
+        if (evidence?.quote || evidence?.fact) {
+          const quote = document.createElement('span');
+          quote.className = 'matrix-evidence';
+          setText(quote, 'Evidence: “' + (evidence.quote || evidence.fact) + '”');
+          item.append(quote);
+        }
+        block.append(item);
+      });
+    }
+    root.append(block);
+  });
+}
 function renderDebate(debate = {}) { const root = $('#debate'); root.replaceChildren(); if (!debate.transcript?.length) { root.append(setText(document.createElement('p'), debate.error ? 'Debate fallback used. The final decision used available evidence.' : 'No debate transcript available.')); return; } debate.transcript.forEach((turn) => { const article = document.createElement('article'); article.className = 'debate-turn'; const speaker = document.createElement('div'); speaker.className = 'speaker'; setText(speaker, `${turn.speaker || 'Agent'}${turn.target ? ` → ${turn.target}` : ''}`); const message = document.createElement('div'); message.className = 'msg'; setText(message, turn.point || turn.stance || turn.message || 'Insufficient evidence in source documents.'); article.append(speaker, message); root.append(article); }); }
 function listWithEvidence(title, entries) { const wrap = document.createElement('div'); wrap.append(setText(document.createElement('h3'), title)); const list = document.createElement('ul'); list.className = 'decision-list'; (entries || []).forEach((entry) => { const li = document.createElement('li'); setText(li, entry.claim || entry.point || safeText(entry)); const quote = entry.evidence?.[0]?.quote || entry.quote; if (quote) { const span = document.createElement('span'); span.className = 'decision-quote'; setText(span, `“${quote}”`); li.append(span); } list.append(li); }); if (!list.childElementCount) list.append(setText(document.createElement('li'), 'Insufficient evidence in source documents.')); wrap.append(list); return wrap; }
 function renderDecision(decision = {}) {
@@ -174,20 +221,21 @@ function renderConsensusDonut(result) {
   const root = $('#consensusDonut');
   if (!root) return;
   const d = result.debate || {};
-  const values = [
-    ['Agreed', d.agreedPoints?.length || 0],
-    ['Disagreed', d.disagreedPoints?.length || 0],
-    ['Shifted', d.shiftedStances?.length || 0],
-    ['Unresolved', d.unresolvedStances?.length || 0]
-  ];
-  const total = Math.max(1, values.reduce((sum, [,v]) => sum + v, 0));
-  let angle = 0;
-  const segments = values.map(([label, value]) => {
-    const pct = Math.round(value / total * 100);
-    const start = angle; angle += pct;
-    return '<span class="donut-legend"><i style="--from:' + start + ';--to:' + angle + '"></i>' + label + ' <b>' + pct + '%</b></span>';
+  const values = [['Agreed', d.agreedPoints?.length || 0], ['Disagreed', d.disagreedPoints?.length || 0], ['Shifted', d.shiftedStances?.length || 0], ['Unresolved', d.unresolvedStances?.length || 0]];
+  const total = values.reduce((sum, [, value]) => sum + value, 0);
+  const safeTotal = total || 1;
+  const percentages = values.map(([label, value]) => ({ label, value, pct: total ? Math.round(value / safeTotal * 100) : 0 }));
+  const radius = 42, circumference = 2 * Math.PI * radius;
+  let offset = 0;
+  const colors = ['var(--white)', 'var(--g2)', 'var(--g3)', 'var(--g5)'];
+  const arcs = percentages.map((item, index) => {
+    const length = item.pct / 100 * circumference, gap = item.pct ? Math.min(3, length * .12) : 0, dash = Math.max(0, length - gap);
+    const segment = '<circle class="consensus-segment" cx="60" cy="60" r="' + radius + '" fill="none" stroke="' + colors[index] + '" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + dash + ' ' + (circumference - dash) + '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 60 60)"></circle>';
+    offset += length;
+    return segment;
   }).join('');
-  root.innerHTML = '<div class="donut-chart" style="--split:' + values.map(([,v]) => v/total*100).join(',') + '"><div>' + values.map(([,v]) => Math.round(v/total*100)).join('') + '</div></div><div class="donut-legend-list">' + segments + '</div>';
+  const legend = percentages.map((item, index) => '<div class="donut-legend"><i style="background:' + colors[index] + '"></i><span>' + item.label + '</span><b>' + item.pct + '%</b></div>').join('');
+  root.innerHTML = '<div class="consensus-chart" role="img" aria-label="Consensus distribution"><svg viewBox="0 0 120 120" class="consensus-svg"><circle cx="60" cy="60" r="' + radius + '" fill="none" stroke="var(--line)" stroke-width="12"></circle>' + arcs + '<text x="60" y="57" class="consensus-total">' + total + '</text><text x="60" y="72" class="consensus-caption">POINTS</text></svg></div><div class="donut-legend-list">' + legend + '</div>';
 }
 function renderResult(result) {
   state.result = result;
