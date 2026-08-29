@@ -83,7 +83,7 @@ The pipeline (`src/pipeline.js`) runs in five strict stages:
   UI renders the candidate profile, the 4 independent opinion cards (with
   quotes and score bars), the debate timeline, and the final decision panel
   side by side.
-- **LLM client** (`src/llm/llmClient.js`): wraps the Anthropic Messages API.
+- **LLM client** (`src/llm/llmClient.js`): wraps the Google Gemini API.
   If `ANTHROPIC_API_KEY` is unset (or `FORCE_MOCK_MODE=true`), every call
   transparently uses a deterministic heuristic fallback instead — so the
   *exact same code path and JSON contract* is exercised whether or not a
@@ -107,7 +107,7 @@ By default this runs in **Mock Mode** — click "Load Sample Resume +
 Transcript" and then "Run Multi-Agent Evaluation" to see the whole pipeline
 end to end with zero configuration.
 
-To use real Claude API calls instead:
+To use real Gemini API calls:
 
 ```bash
 cp .env.example .env
