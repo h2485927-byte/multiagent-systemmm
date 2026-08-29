@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-const generateJson = vi.fn();
+const { generateJson } = vi.hoisted(() => ({ generateJson: vi.fn() }));
+
 vi.mock('../src/llm/llmClient.js', () => ({
   generateJson,
   LLMError: class LLMError extends Error {
