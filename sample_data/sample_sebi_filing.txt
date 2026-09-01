@@ -1,0 +1,10 @@
+SIMULATED SEBI / EXCHANGE FILING
+Company: Demo Financial Services Ltd.
+Period: Q1 FY2026
+
+Line 4: Revenue increased 12% year-over-year, supported by growth in retail lending.
+Line 5: Net profit increased 9% year-over-year.
+Line 6: Management stated that asset quality remained stable during the quarter.
+Line 7: Gross NPA increased marginally from 1.8% to 1.9%.
+Line 8: The board approved continued investment in digital distribution.
+Line 9: Forward-looking statements are subject to market, regulatory and credit risks.
