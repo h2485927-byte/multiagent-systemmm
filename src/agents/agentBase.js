@@ -1,59 +1,47 @@
 import { generateJson, LLMError } from '../llm/llmClient.js';
 
 export const persona = {
-  technicalAgent: 'Technical Agent',
-  hrAgent: 'HR & Culture Agent',
-  skepticAgent: 'Skeptic Agent',
-  hiringManagerAgent: 'Hiring Manager Agent'
+  technicalAgent: 'Technical Market Agent',
+  fundamentalAgent: 'Fundamental & Filing Agent',
+  sentimentAgent: 'Sentiment & Flow Agent'
 };
 
-export function buildPrompt(name, instructions, profile) {
-  return `You are ${persona[name]}. ROUND ONE IS ISOLATED. You receive ONLY source documents below; do not assume other agents' views. Job Description is the benchmark. Never invent evidence. Every score/claim MUST include verbatim quote evidence from RESUME, TRANSCRIPT, or JD. If evidence is absent say exactly "Insufficient evidence in source documents".
-
-Return ONLY a complete JSON object with this exact shape:
-{"agent":"${persona[name]}","score":0,"confidence":0,"weight":0,"summary":"...","evidence":[{"claim":"...","source":"RESUME|TRANSCRIPT|JD","quote":"verbatim quote"}],"flags":[{"severity":"low|medium|high|critical","claim":"...","evidence":{"source":"...","quote":"..."}}],"stance":"..."}
-
-Rules: score and confidence MUST be numbers from 0 to 100. Do not omit any top-level field. The agent field MUST be exactly "${persona[name]}".
-INSTRUCTIONS: ${instructions}
-RESUME:
-${profile.resumeText}
-TRANSCRIPT:
-${profile.transcriptText}
-JOB DESCRIPTION:
-${profile.jdText}`;
+export function buildPrompt(name, instructions, profile, context = {}) {
+  return [
+    `You are ${persona[name]}.`,
+    'Analyze only supplied financial data. Educational intelligence only; never guarantee returns or invent evidence.',
+    'Return ONLY JSON with agent_name, signal_label, confidence_score, reasoning, cited_sources, risk_notes, stance.',
+    `INSTRUCTIONS: ${instructions}`,
+    `MARKET: ${JSON.stringify(profile.marketData || {})}`,
+    `PROFILE: ${JSON.stringify({ risk_tolerance: profile.risk_tolerance, investment_horizon: profile.investment_horizon, portfolio_holdings: profile.portfolio_holdings })}`,
+    `SOURCES: ${JSON.stringify(context.sources || [])}`
+  ].join('\n');
 }
 
-function normalizeAgentOutput(name, output) {
-  if (!output || typeof output !== 'object' || Array.isArray(output)) {
-    throw new LLMError('Agent returned an empty or invalid JSON object.', 'INVALID_AGENT_OUTPUT');
-  }
-  const score = Number(output.score);
-  const confidence = Number(output.confidence);
-  if (!Number.isFinite(score) || !Number.isFinite(confidence)) {
-    throw new LLMError('Agent response omitted a numeric score or confidence.', 'INVALID_AGENT_OUTPUT');
-  }
+function normalize(name, output) {
+  if (!output || typeof output !== 'object') throw new LLMError('Invalid agent output', 'INVALID_AGENT_OUTPUT');
+  const confidence = Number(output.confidence_score);
+  if (!Number.isFinite(confidence)) throw new LLMError('Missing numeric confidence', 'INVALID_AGENT_OUTPUT');
+
   return {
-    ...output,
-    agent: persona[name],
-    score: Math.max(0, Math.min(100, Math.round(score))),
-    confidence: Math.max(0, Math.min(100, Math.round(confidence))),
-    weight: Math.max(0, Math.min(1, Number(output.weight) || 0)),
-    summary: String(output.summary || ''),
-    evidence: Array.isArray(output.evidence) ? output.evidence : [],
-    flags: Array.isArray(output.flags) ? output.flags : [],
-    stance: String(output.stance || '')
+    agent_name: persona[name],
+    signal_label: ['Bullish', 'Bearish', 'Neutral', 'Conflicted', 'Unavailable'].includes(output.signal_label) ? output.signal_label : 'Unavailable',
+    confidence_score: Math.max(0, Math.min(100, Math.round(confidence))),
+    reasoning: String(output.reasoning || ''),
+    cited_sources: Array.isArray(output.cited_sources) ? output.cited_sources : [],
+    risk_notes: Array.isArray(output.risk_notes) ? output.risk_notes : [],
+    stance: String(output.stance || ''),
+    error: null
   };
 }
 
-export async function runAgent(name, instructions, profile) {
-  const prompt = buildPrompt(name, instructions, profile);
+export async function runAgent(name, instructions, profile, context = {}) {
+  const prompt = buildPrompt(name, instructions, profile, context);
   let lastError;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const output = await generateJson(
-        attempt === 0 ? prompt : prompt + '\n\nVALIDATION RETRY: Your previous response was incomplete. Return the full required JSON object with numeric score and confidence now.'
-      );
-      return normalizeAgentOutput(name, output);
+      const suffix = attempt ? '\nReturn complete valid JSON with numeric confidence_score.' : '';
+      return normalize(name, await generateJson(prompt + suffix));
     } catch (error) {
       lastError = error;
     }
@@ -63,14 +51,13 @@ export async function runAgent(name, instructions, profile) {
 
 export function fallbackAgent(name, error) {
   return {
-    agent: persona[name],
-    score: null,
-    confidence: 0,
-    weight: 0,
-    summary: 'Agent analysis was unavailable; no candidate conclusion was inferred.',
-    evidence: [],
-    flags: [{ severity: 'high', claim: 'Agent evaluation unavailable', evidence: { source: 'system', quote: 'Agent request failed. No candidate evidence was fabricated.' } }],
-    stance: 'Insufficient evidence in source documents',
+    agent_name: persona[name],
+    signal_label: 'Unavailable',
+    confidence_score: 0,
+    reasoning: 'Agent analysis unavailable; no unsupported conclusion was generated.',
+    cited_sources: [],
+    risk_notes: ['Data or model failure prevented analysis.'],
+    stance: 'Unavailable',
     error: { code: error.code || 'AGENT_FAILURE', message: error.message }
   };
 }
