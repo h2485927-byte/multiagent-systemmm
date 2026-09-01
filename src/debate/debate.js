@@ -1,6 +1,33 @@
-import { generateJson } from '../llm/llmClient.js';
-
 export async function runDebate(profile, agents) {
-  const prompt = `ROUND TWO MULTI-AGENT DEBATE. Source benchmark JD:\n${profile.jdText}\nIndependent outputs:\n${JSON.stringify(agents)}\nReturn JSON {transcript:[{speaker,target,stance,point,evidence:[{source,quote}]}],agreedPoints:[{point,agents,evidence}],disagreedPoints:[{point,agents,evidence}],shiftedStances:[{agent,from,to,reason,evidence}],unresolvedStances:[{agent,stance,evidence}]}. Force at least one direct challenge/agreement/refinement referencing another agent's specific point. Every factual statement needs verbatim source evidence; otherwise state insufficient evidence.`;
-  return generateJson(prompt, { timeoutMs: 30000 });
+  const live = agents.filter(agent => !agent.error);
+  const labels = [...new Set(live.map(agent => agent.signal_label))];
+  const conflict = labels.length > 1;
+
+  return {
+    execution: 'parallel',
+    agreedPoints: conflict ? [] : [{
+      point: live[0]?.signal_label || 'Unavailable',
+      agents: live.map(agent => agent.agent_name),
+      evidence: live.flatMap(agent => agent.cited_sources)
+    }],
+    disagreedPoints: conflict ? [{
+      point: 'Agents produced conflicting market signals',
+      agents: live.map(agent => agent.agent_name),
+      evidence: live.flatMap(agent => agent.cited_sources)
+    }] : [],
+    shiftedStances: [],
+    unresolvedStances: agents
+      .filter(agent => agent.error || agent.signal_label === 'Conflicted')
+      .map(agent => ({
+        agent: agent.agent_name,
+        stance: agent.signal_label,
+        evidence: agent.cited_sources
+      })),
+    transcript: agents.map(agent => ({
+      speaker: agent.agent_name,
+      stance: agent.stance,
+      point: agent.reasoning,
+      evidence: agent.cited_sources
+    }))
+  };
 }
