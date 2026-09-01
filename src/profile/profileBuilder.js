@@ -1,4 +1,33 @@
 import { z } from 'zod';
-export const ProfileSchema=z.object({resumeText:z.string().min(1),transcriptText:z.string().min(1),jdText:z.string().min(1),skills:z.array(z.string()),experience:z.array(z.string()),claims:z.array(z.string())});
-const clean=t=>String(t||'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,' ').replace(/\s+/g,' ').trim().slice(0,120000);
-export function buildProfile({resumeText,transcriptText,jdText}){const r=clean(resumeText),t=clean(transcriptText),j=clean(jdText); if(!r||!t||!j) throw new Error('Resume, transcript, and Job Description must contain readable text.'); const skills=[...new Set((r.match(/\b(React|Node\.js|JavaScript|TypeScript|Python|AWS|Kubernetes|Docker|SQL)\b/gi)||[]))]; const experience=(r.match(/[^.]{0,80}(?:years|year)[^.]{0,80}/gi)||[]).slice(0,20); const claims=r.split(/(?<=[.!?])\s+/).filter(x=>x.length>25).slice(0,30); return ProfileSchema.parse({resumeText:r,transcriptText:t,jdText:j,skills,experience,claims});}
+
+export const ProfileSchema = z.object({
+  risk_tolerance: z.enum(['Conservative', 'Moderate', 'Aggressive']),
+  portfolio_holdings: z.array(z.object({
+    symbol: z.string(),
+    allocation: z.number().min(0).max(100)
+  })).default([]),
+  investment_horizon: z.enum(['Short-term', 'Medium-term', 'Long-term']),
+  interaction_history: z.array(z.object({
+    event: z.string(),
+    timestamp: z.string()
+  })).default([]),
+  marketData: z.record(z.any()).default({})
+});
+
+export function buildProfile(input = {}) {
+  return ProfileSchema.parse({
+    risk_tolerance: input.risk_tolerance || input.riskTolerance || 'Moderate',
+    investment_horizon: input.investment_horizon || input.investmentHorizon || 'Medium-term',
+    portfolio_holdings: Array.isArray(input.portfolio_holdings) ? input.portfolio_holdings : [],
+    interaction_history: Array.isArray(input.interaction_history) ? input.interaction_history : [],
+    marketData: input.marketData || input.market_feed || {}
+  });
+}
+
+export function riskWeight(profile) {
+  return { Conservative: 0.55, Moderate: 0.75, Aggressive: 1 }[profile.risk_tolerance];
+}
+
+export function concentrationScore(profile) {
+  return Math.round(Math.max(0, ...profile.portfolio_holdings.map(item => item.allocation)));
+}
